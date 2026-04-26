@@ -339,6 +339,18 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Add scroll lock effect for modals
+  useEffect(() => {
+    if (isAdding || selectedAsset) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isAdding, selectedAsset]);
+
   const stats = useMemo(() => {
     const today = startOfToday();
     let totalInitialValue = 0;
@@ -2227,7 +2239,7 @@ export default function App() {
                         <input
                           type="url"
                           placeholder="粘贴第三方图片链接以自定义头像..."
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-xs outline-none focus:border-[#F97316] transition-all placeholder:text-white/20 text-center"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-base outline-none focus:border-[#F97316] transition-all placeholder:text-white/20 text-center"
                           value={newAsset.imageUrl}
                           onChange={(e) =>
                             setNewAsset({ ...newAsset, imageUrl: e.target.value })
@@ -2240,11 +2252,10 @@ export default function App() {
                         资产核心标识与名称
                       </label>
                       <input
-                        autoFocus
                         required
                         type="text"
                         placeholder="例如: iPhone 16 Pro Max..."
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm outline-none focus:border-[#F97316] transition-all placeholder:text-white/10"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-base outline-none focus:border-[#F97316] transition-all placeholder:text-white/10"
                         value={newAsset.name}
                         onChange={(e) =>
                           setNewAsset({ ...newAsset, name: e.target.value })
@@ -2276,7 +2287,7 @@ export default function App() {
                           <input
                             required
                             type="date"
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm outline-none focus:border-[#F97316] appearance-none"
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-base outline-none focus:border-[#F97316] appearance-none"
                             style={{ colorScheme: "dark" }}
                             value={newAsset.purchaseDate}
                             onChange={(e) =>
