@@ -205,128 +205,7 @@ export default function App() {
   }, []);
 
   const loadDefaults = () => {
-    setAssets([
-      {
-        id: "1",
-        name: "Apple Vision Pro",
-        price: 29999,
-        purchaseDate: format(subDays(new Date(), 2), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "mint",
-      },
-      {
-        id: "2",
-        name: "MacBook Pro M3 Max",
-        price: 32999,
-        purchaseDate: format(subDays(new Date(), 120), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "good",
-        targetDailyCost: 15,
-      },
-      {
-        id: "3",
-        name: "iPhone 12 Pro",
-        price: 8499,
-        purchaseDate: format(subDays(new Date(), 1450), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "worn",
-        targetDailyCost: 4.5,
-        isRetired: true,
-      },
-      {
-        id: "4",
-        name: "联想拯救者 Y9000P",
-        price: 9999,
-        purchaseDate: format(subDays(new Date(), 600), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "good",
-        isSold: true,
-        soldPrice: 5200,
-        soldDate: format(subDays(new Date(), 30), "yyyy-MM-dd"),
-      },
-      {
-        id: "101",
-        name: "DJI Mavic 3 Pro",
-        price: 13888,
-        purchaseDate: format(subDays(new Date(), 400), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "good",
-        targetDailyCost: 10,
-      },
-      {
-        id: "102",
-        name: "Sony A7R5 (body)",
-        price: 24999,
-        purchaseDate: format(subDays(new Date(), 450), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "good",
-        targetDailyCost: 20,
-      },
-      {
-        id: "103",
-        name: "Leica Q3",
-        price: 48500,
-        purchaseDate: format(subDays(new Date(), 180), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "mint",
-        targetDailyCost: 35,
-      },
-      {
-        id: "5",
-        name: "Tesla Model 3 Performance",
-        price: 335900,
-        purchaseDate: format(subDays(new Date(), 365), "yyyy-MM-dd"),
-        category: "交通工具",
-        condition: "good",
-        targetDailyCost: 200,
-      },
-      {
-        id: "6",
-        name: "Herman Miller Embody",
-        price: 12500,
-        purchaseDate: format(subDays(new Date(), 800), "yyyy-MM-dd"),
-        category: "家居",
-        condition: "mint",
-        targetDailyCost: 5,
-      },
-      {
-        id: "7",
-        name: "Nike x Travis Scott AJ1 Low",
-        price: 7800,
-        purchaseDate: format(subDays(new Date(), 90), "yyyy-MM-dd"),
-        category: "其他",
-        condition: "mint",
-      },
-      {
-        id: "8",
-        name: "Nintendo Switch OLED",
-        price: 2699,
-        purchaseDate: format(subDays(new Date(), 700), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "good",
-        isSold: true,
-        soldPrice: 1600,
-        soldDate: format(subDays(new Date(), 60), "yyyy-MM-dd"),
-      },
-      {
-        id: "9",
-        name: "HHKB Professional Hybrid",
-        price: 2499,
-        purchaseDate: format(subDays(new Date(), 1000), "yyyy-MM-dd"),
-        category: "电子设备",
-        condition: "good",
-        targetDailyCost: 1,
-      },
-      {
-        id: "10",
-        name: "La Marzocco Linea Micra",
-        price: 28500,
-        purchaseDate: format(subDays(new Date(), 240), "yyyy-MM-dd"),
-        category: "家居",
-        condition: "mint",
-        targetDailyCost: 15,
-      },
-    ]);
+    setAssets([]);
   };
 
   // Persistence: Save to localStorage
@@ -357,6 +236,7 @@ export default function App() {
     let totalMarketValue = 0;
     let totalDailyCost = 0;
     let totalTodayMarketChange = 0;
+    let totalActualDailyCost = 0;
     
     // Split assets into categories for warehouse analysis
     const activeAssets = assets.filter(a => !a.isSold && !a.isRetired);
@@ -383,6 +263,7 @@ export default function App() {
       totalInitialValue += assetPrice;
       totalMarketValue += marketPrice;
       totalDailyCost += dailyCost;
+      totalActualDailyCost += actualDailyCost;
 
       const seed = asset.id
         .split("")
@@ -432,19 +313,7 @@ export default function App() {
       else if (efficiencyScore >= 25) healthGrade = "C";
       else healthGrade = "D";
 
-      if (asset.id === "1") {
-        statusTag = "开箱阵痛期";
-        healthStatus = "danger";
-      } else if (asset.id === "2") {
-        statusTag = "主力服役中";
-        healthStatus = "healthy";
-      } else if (asset.id === "3") {
-        statusTag = "👑 功勋退役";
-        healthStatus = "heroic";
-      } else if (asset.id === "4") {
-        statusTag = "不良资产";
-        healthStatus = "warning";
-      } else if (isSunkCostShield) {
+      if (isSunkCostShield) {
         statusTag = "准新保护期";
         healthStatus = "healthy";
       } else if (isPureProfit && efficiencyScore >= 90) {
@@ -534,7 +403,7 @@ export default function App() {
       };
     });
 
-    const totalNetPerformance = totalTodayMarketChange - totalDailyCost;
+    const totalNetPerformance = totalActualDailyCost;
     const portfolioHedgingRate =
       totalDailyCost > 0
         ? (totalTodayMarketChange / totalDailyCost) * 100
@@ -837,8 +706,7 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-white/50">资产组合概览</p>
                         <div className={cn(
-                          "size-1.5 rounded-full animate-pulse",
-                          stats.totalNetPerformance >= 0 ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" : "bg-rose-400 shadow-[0_0_12px_rgba(251,113,133,0.8)]"
+                          "size-1.5 rounded-full bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,0.8)]"
                         )} />
                       </div>
                       <h2 className="text-[42px] font-black font-mono tracking-tighter tabular-nums text-white leading-none">
@@ -860,12 +728,11 @@ export default function App() {
                     <div className="absolute left-1/2 top-1 bottom-1 w-px bg-white/5 -translate-x-1/2" />
 
                     <div className="space-y-1.5 pr-4">
-                      <p className="text-[10px] font-black uppercase text-white/50 tracking-widest select-none">净收益表现</p>
+                      <p className="text-[10px] font-black uppercase text-white/50 tracking-widest select-none">各资产日消耗总和</p>
                       <div className={cn(
-                        "flex items-baseline gap-1.5 font-mono font-black text-[24px] leading-tight",
-                        stats.totalNetPerformance >= 0 ? "text-emerald-400" : "text-rose-400",
+                        "flex items-baseline gap-1.5 font-mono font-black text-[24px] leading-tight text-white/90",
                       )}>
-                        <span>{stats.totalNetPerformance >= 0 ? "+" : ""}{stats.totalNetPerformance.toFixed(0)}</span>
+                        <span>{stats.totalNetPerformance.toFixed(1)}</span>
                         <span className="text-[8px] font-bold opacity-40 uppercase tracking-tighter">人民币</span>
                       </div>
                     </div>
@@ -913,7 +780,7 @@ export default function App() {
               <>
                 {/* Category Filter - Segmented Control Style */}
                 <div className="px-5">
-                  <div className="flex gap-2 p-1.5 bg-white/50 rounded-2xl border border-black/5 overflow-x-auto scrollbar-hide no-scrollbar relative">
+                  <div className="flex gap-2 p-1.5 bg-white/50 rounded-2xl border border-black/5 overflow-x-auto scrollbar-hide no-scrollbar relative touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat.name}
@@ -1057,15 +924,19 @@ export default function App() {
                             drag="x"
                             dragConstraints={{ left: -160, right: 0 }}
                             dragElastic={0.1}
+                            dragMomentum={true}
                             onDragEnd={(e, info) => {
-                              if (info.offset.x > 50) {
-                                // Reset position if swiped right or too little
+                              if (info.offset.x < -80) {
+                                setSwipedAssetId(asset.id);
+                              } else if (info.offset.x > 20) {
+                                setSwipedAssetId(null);
                               }
                             }}
+                            animate={{ x: swipedAssetId === asset.id ? -160 : 0 }}
                             onClick={() => setSelectedAsset(asset)}
                             whileTap={{ scale: 0.98 }}
                             className={cn(
-                              "relative bg-[#1E1E1E] rounded-[32px] p-5 shadow-xl border border-white/5 cursor-pointer overflow-hidden z-10 transition-transform",
+                              "relative bg-[#1E1E1E] rounded-[32px] p-5 shadow-xl border border-white/5 cursor-pointer overflow-hidden z-10",
                             )}
                           >
                             <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50" />
