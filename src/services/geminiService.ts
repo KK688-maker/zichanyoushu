@@ -4,11 +4,13 @@ const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as stri
 
 export interface MarketAnalysis {
   estimatedMarketPrice: number;
+  priceRange?: { min: number; max: number };
   confidence: number;
   suggestion: 'hold' | 'sell' | 'monitor';
   reasoning: string;
   marketDemandIndex: number; // 0-100
   priority: 'info' | 'warning' | 'critical';
+  isUnrecognized?: boolean;
 }
 
 export async function analyzeMarket(assetName: string, purchasePrice: number, daysHeld: number, condition: 'mint' | 'good' | 'worn' = 'good'): Promise<MarketAnalysis> {
@@ -17,45 +19,58 @@ export async function analyzeMarket(assetName: string, purchasePrice: number, da
     contents: [
       {
         role: "user",
-        parts: [{ text: `分析资产 "${assetName}" 的当前市场价值与处置建议。
-        原始购买价格: ¥${purchasePrice}。
-        已持有天数: ${daysHeld} 天。
-        成色状况: ${condition === 'mint' ? '99新/准新' : condition === 'good' ? '成色良好' : '战斗成色/明显使用痕迹'}。
+        parts: [{ text: `你是一位专业的二手交易市场分析师。请分析资产 "${assetName}" 的当前市场价值。
         
-        请结合以下核心权重逻辑分析：
-        1. 沉没成本保护伞：若持有 < 30天，除非极端情况，否则屏蔽“建议卖出”，以安抚和鼓励持有为主，话术应为【持有确认】。
-        2. 收益期判定：若实际日耗远低于目标预期（如已持有数年），判定为“超额收益期”，话术应为“纯收益期，随时可变现”。
-        3. 代际衰退加速：若距下一代发布不足30天且当前残值尚在高位，触发红色【行动指令】（critical），建议获利离场。
-        4. 成色修正：${condition === 'mint' ? '准新机器二次流通价值极高，更不应轻易建议离场' : '成色较差会显著降低残值，修正估价'}。
-        
-        提供建议的市场价、操作建议(hold/sell/monitor)、供需热度(0-100)及视觉优先级(info/warning/critical)。` }]
+        数据背景:
+        - 原始购入价: ¥${purchasePrice}
+        - 已持有时间: ${daysHeld} 天
+        - 成色状况: ${condition === 'mint' ? '99新' : condition === 'good' ? '良好' : '较差'}
+
+        分析要求:
+        1. 市场识别: 如果该资产名称 "${assetName}" 过于模糊、是随机乱码或非标准商品名，请将 isUnrecognized 设为 true。
+        2. 价格评估: 给出当前该型号在主流二手平台(如闲鱼、拍拍)的真实平均成交价，并提供一个合理的价格波动区间 (min 到 max)。
+        3. 决策建议: 
+           - 如果处于换代前夕或残值进入暴跌期，建议 sell。
+           - 如果资产具有保值性或持有成本低，建议 hold。
+           - 如果市场剧烈波动，建议 monitor。
+        4. 沉没成本原则: 持有不足 30 天的资产应给予 hold 肯定，除非市场价格异常崩溃。
+        5. 准确性: 如果你不确定该资产的确切行情，请给出 conservative (保守) 的估价并在 reasoning 中如实说明。
+
+        不要制造虚假的型号数据。` }]
       }
     ],
     config: {
-      systemInstruction: `你是一位极度精准的财务资产价值精算师。
-      核心使命：把“绝对跌价”转化为“相对性价比”。
-      
-      输出规则：
-      - estimatedMarketPrice: 考虑成色修正后的估价。
-      - suggestion: hold (持有), sell (变现), monitor (观察)。
-      - reasoning: 必须使用中文。严格遵循：
-        - 持有 < 30天：必须使用【持有确认】语气。
-        - 已经完美赚回本金（低日耗）：必须使用“超额收益”相关正向鼓励话术。
-        - 换代前一个月且价格尚高：必须使用【行动指令】红色预警话术。
-      - marketDemandIndex: 供需活跃度。
-      - priority: info(日常/保护期), warning(正常加速), critical(换代暴跌前夕)。`,
+      systemInstruction: `输出 JSON 格式。如果资产型号无法识别，必须诚实回答。
+      字段要求:
+      - isUnrecognized: boolean (如果无法定位到具体商品型号则为 true)
+      - estimatedMarketPrice: number (平均值)
+      - priceRange: { min: number, max: number } (二手价格参考区间)
+      - confidence: number (0-1)
+      - suggestion: 'hold' | 'sell' | 'monitor'
+      - reasoning: string (中文，简洁有力，说明价格依据)
+      - marketDemandIndex: number (0-100)
+      - priority: 'info' | 'warning' | 'critical' (风险等级)`,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
           estimatedMarketPrice: { type: Type.NUMBER },
+          priceRange: { 
+            type: Type.OBJECT,
+            properties: {
+              min: { type: Type.NUMBER },
+              max: { type: Type.NUMBER }
+            },
+            required: ["min", "max"]
+          },
           confidence: { type: Type.NUMBER },
           suggestion: { type: Type.STRING, enum: ['hold', 'sell', 'monitor'] },
           reasoning: { type: Type.STRING },
           marketDemandIndex: { type: Type.NUMBER },
-          priority: { type: Type.STRING, enum: ['info', 'warning', 'critical'] }
+          priority: { type: Type.STRING, enum: ['info', 'warning', 'critical'] },
+          isUnrecognized: { type: Type.BOOLEAN }
         },
-        required: ["estimatedMarketPrice", "confidence", "suggestion", "reasoning", "marketDemandIndex", "priority"]
+        required: ["estimatedMarketPrice", "priceRange", "confidence", "suggestion", "reasoning", "marketDemandIndex", "priority"]
       }
     }
   });
