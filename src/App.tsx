@@ -190,23 +190,19 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           setAssets(parsed);
         } else {
-          loadDefaults();
+          setAssets([]);
         }
       } catch (e) {
         console.error("Failed to load assets", e);
-        loadDefaults();
+        setAssets([]);
       }
     } else {
-      loadDefaults();
+      setAssets([]);
     }
   }, []);
-
-  const loadDefaults = () => {
-    setAssets([]);
-  };
 
   // Persistence: Save to localStorage
   useEffect(() => {
@@ -252,13 +248,14 @@ export default function App() {
         console.error("Date parsing failed for asset", asset.id, e);
       }
       
-      const conditionMultiplier = asset.condition === "mint" ? 0.92 : asset.condition === "worn" ? 0.7 : 0.85;
+      const conditionMultiplier = asset.condition === "mint" ? 0.96 : asset.condition === "worn" ? 0.82 : 0.90;
+      // If no AI analysis, provide a conservative estimated market price based on condition to avoid 0 cost
       const marketPrice =
-        asset.analysis?.estimatedMarketPrice || (asset.price || 0) * conditionMultiplier;
+        asset.analysis?.estimatedMarketPrice || (asset.price * conditionMultiplier) || 0;
 
       const assetPrice = asset.price || 0;
       const dailyCost = assetPrice / days;
-      const actualDailyCost = (assetPrice - marketPrice) / days;
+      const actualDailyCost = Math.max(0.1, (assetPrice - marketPrice) / days);
 
       totalInitialValue += assetPrice;
       totalMarketValue += marketPrice;
@@ -427,53 +424,37 @@ export default function App() {
   }, [assets, currentTime]);
 
   const handleAnalyze = async (asset: Asset) => {
-    const validation = validateAssetName(asset.name);
-    
-    if (validation.isUnrecognized) {
-        const updatedAsset: Asset = {
-            ...asset,
-            isUnrecognized: true,
-            analysis: {
-                estimatedMarketPrice: asset.price,
-                confidence: 0,
-                suggestion: 'monitor',
-                reasoning: "📴 未知资产图谱。系统暂未收录该型号的市场流通数据。您可以手动设定目标日耗作为记账参考，或精确修改型号以激活 AI 市场追踪。",
-                marketDemandIndex: 5,
-                priority: 'info',
-                updatedAt: new Date().toISOString()
-            },
-            efficiencyScore: 0
-        };
-        setAssets((prev) => prev.map((a) => (a.id === asset.id ? updatedAsset : a)));
-        if (selectedAsset?.id === asset.id) setSelectedAsset(updatedAsset);
-        setSuccessMsg("AI 警告: 未识别到标准资产库，已进入离线评估模式");
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
-        return;
-    }
-
     setAnalyzingId(asset.id);
     try {
       const daysHeld = differenceInDays(new Date(), parseISO(asset.purchaseDate));
       const result = await analyzeMarket(asset.name, asset.price, daysHeld, asset.condition);
-      const updatedAsset = {
+      
+      const updatedAsset: Asset = {
         ...asset,
+        isUnrecognized: result.isUnrecognized,
         analysis: { ...result, updatedAt: new Date().toISOString() },
-        efficiencyScore: Math.round(
-          Math.min(100, Math.max(0, (result.confidence * 0.7 + (asset.targetDailyCost ? (asset.targetDailyCost / (asset.actualDailyCost || 1)) * 30 : 0))))
+        efficiencyScore: result.isUnrecognized ? 10 : Math.round(
+          Math.min(100, Math.max(0, (result.confidence * 70 + (asset.targetDailyCost ? (asset.targetDailyCost / (asset.actualDailyCost || 1)) * 30 : 0))))
         ),
       };
+
       setAssets((prev) =>
         prev.map((a) => (a.id === asset.id ? updatedAsset : a)),
       );
+      
       if (selectedAsset?.id === asset.id) {
         setSelectedAsset(updatedAsset);
       }
-      setSuccessMsg("行情同步成功");
+      
+      if (result.isUnrecognized) {
+        setSuccessMsg("AI 提示: 无法定位具体市场型号，已切换至基础核算模式");
+      } else {
+        setSuccessMsg("实时行情同步成功");
+      }
       setShowSuccess(true);
     } catch (err) {
       console.error(err);
-      setSuccessMsg("行情同步失败");
+      setSuccessMsg("行情同步失败，请检查网络连接");
       setShowSuccess(true);
     } finally {
       setAnalyzingId(null);
@@ -610,20 +591,6 @@ export default function App() {
     setIsAdding(false);
     setEditingAssetId(null);
   };
-
-  const validateAssetName = (name: string): { isValid: boolean; error?: string; isUnrecognized?: boolean } => {
-    const trimmed = name.trim();
-    if (trimmed.length < 2) return { isValid: false, error: "资产名称过短，请输入至少 2 个有效字符（如 iPhone）。" };
-    if (/^[0-9]+$/.test(trimmed)) return { isValid: false, error: "检测到纯数字输入，请提供具体资产型号或名称以供精准评估。" };
-    if (!/[\u4e00-\u9fa5a-zA-Z]/.test(trimmed)) return { isValid: false, error: "请输入包含中英文字符的有效资产名称。" };
-    
-    // Simulated SKU Check
-    const recognizedKeywords = ['iphone', 'mac', 'vision', 'sony', 'leica', 'dji', 'camera', 'phone', 'laptop', '房', 'house', 'car', 'nike', 'apple', 'action', '积木'];
-    const isRecognized = recognizedKeywords.some(k => trimmed.toLowerCase().includes(k));
-    
-    return { isValid: true, isUnrecognized: !isRecognized };
-  };
-
 
   const removeAsset = (id: string, force = false) => {
     if (force) {
@@ -854,15 +821,9 @@ export default function App() {
                           <Box className="size-8" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-bold text-white/50">暂无匹配资产</p>
-                          <p className="text-[10px] text-white/20">调整筛选条件或点击下方同步样本数据</p>
+                          <p className="text-sm font-bold text-white/50">暂无资产</p>
+                          <p className="text-[10px] text-white/20">点击下方按钮添加您的第一笔资产记录</p>
                         </div>
-                        <button 
-                          onClick={loadDefaults}
-                          className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-full shadow-[0_8px_16px_rgba(79,70,229,0.3)] active:scale-95 transition-all"
-                        >
-                          同步官方演示样本
-                        </button>
                       </div>
                     ) : stats.assets
                     .filter((a) => {
@@ -1885,8 +1846,8 @@ export default function App() {
                                       />
                                    </svg>
                                    <div className="absolute inset-0 flex flex-col items-center justify-center translate-y-1">
-                                       <span className="text-4xl font-black tabular-nums">{selectedAsset.efficiencyScore}</span>
-                                       <span className="text-[9px] font-black text-white/30 uppercase tracking-[4px]">诊断结论</span>
+                                       <span className="text-4xl font-black tabular-nums">{selectedAsset.analysis ? selectedAsset.efficiencyScore : "--"}</span>
+                                       <span className="text-[9px] font-black text-white/30 uppercase tracking-[4px]">{selectedAsset.analysis ? "诊断结论" : "等待评估"}</span>
                                    </div>
                                 </div>
 
@@ -1940,76 +1901,97 @@ export default function App() {
 
                           <div className="text-[14px] leading-[1.7] text-white/80 font-medium tracking-normal px-2">
                             {(() => {
-                              if (selectedAsset.isUnrecognized) {
+                              if (!selectedAsset.analysis) {
                                 return (
-                                  <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-2xl italic text-[13px] leading-relaxed">
-                                    <span className="text-orange-500 font-black mr-2 tracking-widest">【离线报告】</span>
-                                    系统暂未收录该型号的市场流通数据。这意味着我们无法为您提供实时的价格波动预警和行情对比。建议您通过 <span className="font-bold text-white underline decoration-white/20 underline-offset-4 tracking-tight">“手动记账”</span> 模式定期更新其预计现值，以维持身价曲线的准确性。
+                                  <div className="p-6 bg-white/5 border border-white/10 rounded-[32px] text-center space-y-4">
+                                    <div className="size-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                                      <Zap className="size-6 text-white/20" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-white font-bold text-sm tracking-tight">等待启动行情监测</p>
+                                      <p className="text-white/40 text-[11px] leading-relaxed px-4">
+                                        基于新入库资产，我们需要链接 AI 核心引擎以同步当前二级市场的真实残值行情。
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => handleAnalyze(selectedAsset!)}
+                                      className="w-full py-4 bg-[#F97316]/10 hover:bg-[#F97316]/20 text-[#F97316] rounded-2xl text-[11px] font-black uppercase tracking-[2px] transition-all"
+                                    >
+                                      {analyzingId === selectedAsset.id ? "同步算力中..." : "立刻评估市场行情"}
+                                    </button>
                                   </div>
                                 );
                               }
+
+                              if (selectedAsset.isUnrecognized) {
+                                return (
+                                  <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-2xl italic text-[13px] leading-relaxed">
+                                    <span className="text-orange-500 font-black mr-2 tracking-widest">【无法识别型号】</span>
+                                    AI 未能从当前公开数据库及二手平台中精准锁定该型号。可能原因：名称过于宽泛、品牌非主流或输入有误。
+                                    <br/><br/>
+                                    <span className="text-white/60">无法为您提供实时的行情对比。建议您通过修改名称来重试，或手动参考该资产的二手均价。</span>
+                                  </div>
+                                );
+                              }
+
+                              // If we have analysis and it is recognized
                               const days = selectedAsset.days || 3;
                               const isShield = days <= 30;
-                              const isPureProfit = (selectedAsset.actualDailyCost || 0) < (selectedAsset.targetDailyCost ? selectedAsset.targetDailyCost * 0.5 : 2);
                               const isAction = selectedAsset.analysis?.priority === 'critical';
                               
-                              if (isShield) {
-                                return (
-                                  <p>
-                                    <span className="text-[#F97316] font-black mr-1">【持有确认】</span> 
-                                    「{selectedAsset.name}」当前处于 <span className="text-white font-bold underline decoration-[#F97316]/30 underline-offset-4">开箱沉没成本保护期</span>。这是消费电子的必然折损阶段，为了拉低您的当前实际日耗（<span className="text-[#10B981] font-mono font-bold">¥{selectedAsset.actualDailyCost?.toFixed(2)}</span>），强烈建议 <span className="font-black text-white">增加使用频次并持续持有</span>，好好发挥设备的工具价值。
-                                  </p>
-                                );
-                              }
-                              if (isAction) {
-                                return (
-                                  <p>
-                                    <span className="text-red-500 font-black mr-1">【行动指令】</span> 
-                                    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest mr-2 inline-block -translate-y-0.5">高能预警</span>距下一代产品发布预计已进入 <span className="text-white font-black border-b-2 border-red-500/50">30 天倒计时</span>。当前资产残值仍处历史高位，建议趁二手市场均价维持在 <span className="text-red-400 font-mono font-bold">¥{selectedAsset.marketPrice?.toFixed(0)}</span> 以上时 <span className="text-red-400 font-black bg-red-400/10 px-1.5 py-0.5 rounded-md">获利离场</span>，锁定盈余置换新机。
-                                  </p>
-                                );
-                              }
-                              if (selectedAsset.healthStatus === 'heroic') {
-                                return (
-                                  <p>
-                                    <span className="text-yellow-400 font-black mr-1">【功勋资产】</span> 
-                                    <span className="bg-yellow-400/20 text-yellow-500 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest mr-2 inline-block -translate-y-0.5">S级效能·荣誉退役点</span>
-                                    「{selectedAsset.name}」已达成财务史诗成就。它不仅拉低了您的生活成本，更通过极长的陪伴周期实现了 <span className="text-white font-bold border-b-2 border-yellow-400/40">全价值榨取</span>。即便市场建议变现（<span className="text-yellow-400 font-mono font-bold">{hideAmounts ? "¥****" : `¥${selectedAsset.marketPrice?.toFixed(0)}`}</span>），也请将其视为一位值得铭记的功勋伙伴。
-                                  </p>
-                                );
-                              }
-                              if (isPureProfit) {
-                                return (
-                                  <p>
-                                    <span className="text-emerald-400 font-black mr-1">【超额收益】</span> 
-                                    该资产已完美超额完成初始服役目标，当前日耗仅为预期值的 <span className="text-emerald-400 font-black">{Math.round(((selectedAsset.actualDailyCost || 0) / (selectedAsset.targetDailyCost || 1)) * 100)}%</span>。这已是一项处于 <span className="bg-emerald-400/20 text-emerald-100 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest mr-2 inline-block -translate-y-0.5">“纯现金流期”</span> 的优质资产，建议继续 <span className="text-white font-bold border-b-2 border-emerald-400/40">极限持有</span>。
-                                  </p>
-                                );
-                              }
                               return (
-                                <p>
-                                  <span className="text-amber-400 font-black mr-1">【效用监控】</span> 
-                                  资产当前运行健康，单日成本偏差率在合理区间内波动（<span className="text-white font-bold">{Math.round(((selectedAsset.actualDailyCost || 0) / (selectedAsset.targetDailyCost || 1)) * 100)}%</span>）。建议 <span className="text-white/80 font-bold underline decoration-amber-400/20 underline-offset-4">按需服役</span>，无需执行突发财务避险操作。
-                                </p>
+                                <div className="space-y-4">
+                                  <p className="text-white/90 leading-relaxed">
+                                    {selectedAsset.analysis.reasoning}
+                                  </p>
+                                  
+                                  <div className="grid grid-cols-3 bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+                                    <div className="p-3 text-center border-r border-white/5">
+                                      <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">行情信心</p>
+                                      <p className="text-xs font-bold text-emerald-400">{(selectedAsset.analysis.confidence * 100).toFixed(0)}%</p>
+                                    </div>
+                                    <div className="p-3 text-center border-r border-white/5">
+                                      <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">二手区间</p>
+                                      <p className="text-xs font-bold text-white/80">
+                                        {selectedAsset.analysis.priceRange 
+                                          ? `¥${(selectedAsset.analysis.priceRange.min/1000).toFixed(1)}k-¥${(selectedAsset.analysis.priceRange.max/1000).toFixed(1)}k`
+                                          : "--"}
+                                      </p>
+                                    </div>
+                                    <div className="p-3 text-center">
+                                      <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">建议操作</p>
+                                      <p className={cn(
+                                        "text-xs font-bold uppercase",
+                                        selectedAsset.analysis.suggestion === 'hold' ? "text-blue-400" :
+                                        selectedAsset.analysis.suggestion === 'sell' ? "text-red-400" : "text-amber-400"
+                                      )}>
+                                        {selectedAsset.analysis.suggestion === 'hold' ? "坚守持有" :
+                                         selectedAsset.analysis.suggestion === 'sell' ? "获利离场" : "持续观望"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
                               );
                             })()}
                           </div>
 
-                          <div className="pt-8 px-2">
-                             <button
-                                onClick={() => handleAnalyze(selectedAsset!)}
-                                className="w-full py-5 bg-white/5 hover:bg-white/10 active:scale-[0.98] rounded-3xl border border-white/10 flex items-center justify-center gap-3 transition-all group overflow-hidden relative"
-                              >
-                                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                                <RefreshCw className={cn("size-5 text-[#F97316] transition-transform duration-700", analyzingId === selectedAsset.id ? "animate-spin" : "group-hover:rotate-180")} />
-                                <span className={cn(
-                                  "text-[11px] font-black uppercase tracking-[3px]",
-                                  analyzingId === selectedAsset.id ? "text-orange-400" : "text-white/60 group-hover:text-black"
-                                )}>
-                                  {analyzingId === selectedAsset.id ? "正在同步算力..." : "重新评估市场行情"}
-                                </span>
-                              </button>
-                          </div>
+                          {selectedAsset.analysis && (
+                            <div className="pt-8 px-2">
+                               <button
+                                  onClick={() => handleAnalyze(selectedAsset!)}
+                                  className="w-full py-5 bg-white/5 hover:bg-white/10 active:scale-[0.98] rounded-3xl border border-white/10 flex items-center justify-center gap-3 transition-all group overflow-hidden relative"
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                  <RefreshCw className={cn("size-5 text-[#F97316] transition-transform duration-700", analyzingId === selectedAsset.id ? "animate-spin" : "group-hover:rotate-180")} />
+                                  <span className={cn(
+                                    "text-[11px] font-black uppercase tracking-[3px]",
+                                    analyzingId === selectedAsset.id ? "text-orange-400" : "text-white/60"
+                                  )}>
+                                    {analyzingId === selectedAsset.id ? "正在同步算力..." : "重新评估市场行情"}
+                                  </span>
+                                </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
