@@ -760,26 +760,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-slate-50 via-white to-blue-50/50 flex items-center justify-center p-4 py-8 font-sans antialiased text-[#0F172A]">
-      {/* iPhone 17 Frame */}
-      <div className="relative w-full max-w-[400px] aspect-[9/19.5] bg-[#020617] rounded-[55px] p-[12px] shadow-[0_80px_160px_-40px_rgba(15,23,42,0.3)] border border-slate-200/50 overflow-hidden">
-        {/* Screen Content Wrapper */}
-        <div className="relative w-full h-full bg-white rounded-[45px] overflow-hidden flex flex-col">
-          {/* Status Bar */}
-          <div className="h-12 w-full flex items-center justify-between px-8 pt-2 z-[70]">
-            <span className="text-xs font-bold tracking-tighter tabular-nums">
-              9:41
-            </span>
-            <div className="absolute left-1/2 -translate-x-1/2 top-3 w-28 h-7 bg-[#000] rounded-full border border-white/5" />
-            <div className="flex items-center gap-1.5 ">
-              <Signal className="size-3" />
-              <Wifi className="size-3" />
-              <Battery className="size-3" />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto scrollbar-hide relative pb-32 px-5 pt-4 space-y-6">
-            {/* Header */}
+    <div className="min-h-screen bg-slate-50 font-sans antialiased text-[#0F172A] flex flex-col">
+      {/* Main Screen Content */}
+      <div className="relative w-full h-full flex-1 flex flex-col overflow-hidden">
+        
+        <div className="flex-1 overflow-y-auto scrollbar-hide relative px-5 space-y-6 pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(100px+env(safe-area-inset-bottom))]">
+          {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 border border-[#E5E5E5] rounded-full">
@@ -1553,7 +1539,7 @@ export default function App() {
           </div>
 
           {/* Floating Navigation Pill */}
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[90%] h-[72px] bg-[#020617] rounded-full shadow-[0_30px_60px_-12px_rgba(15,23,42,0.6)] flex items-center px-1 z-[60] border border-white/10">
+          <div className="fixed bottom-[calc(24px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] h-[72px] bg-[#020617] rounded-full shadow-[0_30px_60px_-12px_rgba(15,23,42,0.6)] flex items-center px-1 z-[60] border border-white/10">
             <div className="flex-1 flex justify-around items-center">
               <button
                 onClick={() => setCurrentView("dashboard")}
@@ -1630,7 +1616,7 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-[300] bg-black flex flex-col items-center justify-center p-8"
+                className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-8 bg-black/80 backdrop-blur-md"
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#111,black)] pointer-events-none" />
                 
@@ -1739,7 +1725,7 @@ export default function App() {
                 initial={{ y: 20, opacity: 0, x: "-50%" }}
                 animate={{ y: 0, opacity: 1, x: "-50%" }}
                 exit={{ y: -20, opacity: 0, x: "-50%" }}
-                className="absolute top-16 left-1/2 z-[400] px-6 py-3 bg-[#1C1C1E] text-white rounded-2xl border border-white/10 shadow-2xl flex items-center gap-3"
+                className="fixed top-[calc(16px+env(safe-area-inset-top))] left-1/2 z-[400] px-6 py-3 bg-[#1C1C1E] text-white rounded-2xl border border-white/10 shadow-2xl flex items-center gap-3"
               >
                 <div className="size-5 bg-[#10B981] rounded-full flex items-center justify-center">
                   <CheckCircle2 className="size-3 text-white" strokeWidth={3} />
@@ -1766,14 +1752,14 @@ export default function App() {
                   stiffness: 300,
                   mass: 0.8,
                 }}
-                className="absolute inset-0 z-[100] bg-[#1C1C1E] overflow-hidden flex flex-col"
+                className="fixed inset-0 z-[100] bg-[#1C1C1E] overflow-hidden flex flex-col"
               >
-                <div className="flex-1 flex flex-col pt-12 overflow-hidden">
+                <div className="flex-1 flex flex-col pt-[env(safe-area-inset-top)] overflow-hidden">
                   <div className="h-[280px] bg-[#1C1C1E] relative flex-shrink-0 border-b border-white/5">
                     <div className="absolute inset-0 bg-gradient-to-t from-[#1C1C1E] to-transparent opacity-60" />
                     <button
                       onClick={() => setSelectedAsset(null)}
-                      className="absolute top-4 left-6 size-10 bg-white/5 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/10 z-10 active:scale-90 transition-transform"
+                      className="absolute top-[calc(16px+env(safe-area-inset-top))] left-6 size-10 bg-white/5 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/10 z-10 active:scale-90 transition-transform"
                     >
                       <X className="size-5" strokeWidth={2.5} />
                     </button>
@@ -2202,16 +2188,16 @@ export default function App() {
                   stiffness: 300,
                   mass: 0.9,
                 }}
-                className="absolute inset-0 z-[200] bg-[#1C1C1E] flex flex-col overflow-hidden"
+                className="fixed inset-0 z-[200] bg-[#1C1C1E] flex flex-col overflow-hidden"
               >
                 {/* Header mimicking Detail View */}
-                <div className="h-[120px] bg-[#1C1C1E] relative flex-shrink-0 border-b border-white/5 flex items-center px-8 pt-8">
+                <div className="h-[120px] bg-[#1C1C1E] relative flex-shrink-0 border-b border-white/5 flex items-center px-8 pt-[env(safe-area-inset-top)]">
                   <button
                     onClick={() => {
                       setIsAdding(false);
                       setEditingAssetId(null);
                     }}
-                    className="absolute top-8 left-6 size-10 bg-white/5 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/10 z-10 active:scale-90 transition-transform"
+                    className="absolute top-[calc(16px+env(safe-area-inset-top))] left-6 size-10 bg-white/5 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/10 z-10 active:scale-90 transition-transform"
                   >
                     <X className="size-5" strokeWidth={2.5} />
                   </button>
@@ -2426,6 +2412,5 @@ export default function App() {
           </AnimatePresence>
         </div>
       </div>
-    </div>
   );
 }
