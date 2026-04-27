@@ -166,6 +166,15 @@ export default function App() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
+  useEffect(() => {
+    if (showSuccess) {
+      const timer = setTimeout(() => {
+        setShowSuccess(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccess]);
+
   const [insightExpanded, setInsightExpanded] = useState(false);
   const [swipedAssetId, setSwipedAssetId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -257,18 +266,20 @@ export default function App() {
       const dailyCost = assetPrice / days;
       const actualDailyCost = Math.max(0.1, (assetPrice - marketPrice) / days);
 
-      totalInitialValue += assetPrice;
-      totalMarketValue += marketPrice;
-      totalDailyCost += dailyCost;
-      totalActualDailyCost += actualDailyCost;
-
       const seed = asset.id
         .split("")
         .reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const isUp = (seed + today.getDate()) % 2 === 0;
       const changeRange = (seed % 5) + 0.5;
       const todayChange = (isUp ? 1 : -1) * (marketPrice * (changeRange / 100));
-      totalTodayMarketChange += todayChange;
+
+      if (!asset.isSold) {
+        totalInitialValue += assetPrice;
+        totalMarketValue += marketPrice;
+        totalDailyCost += dailyCost;
+        totalActualDailyCost += actualDailyCost;
+        totalTodayMarketChange += todayChange;
+      }
 
       // New: Net Fluctuation (Today's market change minus today's depreciation)
       const netDailyPerformance = todayChange - dailyCost;
@@ -310,7 +321,10 @@ export default function App() {
       else if (efficiencyScore >= 25) healthGrade = "C";
       else healthGrade = "D";
 
-      if (isSunkCostShield) {
+      if (asset.isSold) {
+        statusTag = "";
+        healthStatus = "heroic";
+      } else if (isSunkCostShield) {
         statusTag = "准新保护期";
         healthStatus = "healthy";
       } else if (isPureProfit && efficiencyScore >= 90) {
@@ -332,7 +346,7 @@ export default function App() {
         }
       }
 
-      if (asset.analysis?.suggestion === "sell" && !isSunkCostShield) {
+      if (!asset.isSold && asset.analysis?.suggestion === "sell" && !isSunkCostShield) {
         if (healthStatus === "heroic" || efficiencyScore >= 90) {
           statusTag = "✨ 收益封顶 · 宜置换";
           healthStatus = "heroic";
@@ -340,7 +354,7 @@ export default function App() {
           statusTag = "建议变现";
           healthStatus = "danger";
         }
-      } else if (asset.analysis?.suggestion === "hold") {
+      } else if (!asset.isSold && asset.analysis?.suggestion === "hold") {
         statusTag = "坚持继续";
         healthStatus = "healthy";
       }
@@ -468,7 +482,7 @@ export default function App() {
       soldPrice: price,
       soldDate: format(new Date(), "yyyy-MM-dd"),
       healthStatus: "heroic" as const,
-      statusTag: "已变现",
+      statusTag: "",
       analysis: undefined,
     };
     setAssets((prev) => prev.map((a) => (a.id === asset.id ? updated : a)));
@@ -520,7 +534,6 @@ export default function App() {
   const showFeatureToast = (name: string) => {
     setSuccessMsg(`功能「${name}」研发中，敬请期待 ✨`);
     setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2000);
   };
 
   const handleSaveAsset = (e: React.FormEvent) => {
@@ -574,7 +587,6 @@ export default function App() {
       setAssets([...assets, asset]);
       setSuccessMsg(`「${asset.name}」已成功锚定，财富档案实时同步中`);
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
     }
 
     setNewAsset({
@@ -599,7 +611,6 @@ export default function App() {
       setDeleteConfirmId(null);
       setSuccessMsg("资产已永久从档案中移除");
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 2000);
     } else {
       setDeleteConfirmId(id);
       // Auto reset after 3 seconds
@@ -649,9 +660,6 @@ export default function App() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <button className="h-12 w-12 bg-[#1C1C1E] rounded-2xl flex items-center justify-center text-white shadow-lg border border-white/5">
-                <Signal className="size-5 rotate-45" strokeWidth={2} />
-              </button>
             </div>
             <div className="relative group px-1">
               {/* Background Glow Orb - Positioned under the card */}
@@ -914,68 +922,81 @@ export default function App() {
                                   <h3 className="text-[15px] font-black text-white/90 truncate tracking-tight mb-0.5 max-w-[120px]">
                                     {asset.name}
                                   </h3>
-                                  <div className={cn(
-                                    "px-1.5 py-0.5 rounded-md text-[7px] font-black uppercase tracking-[2px] border inline-flex items-center gap-1",
-                                    asset.healthStatus === 'healthy' || asset.healthStatus === 'heroic' 
-                                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" 
-                                      : asset.healthStatus === 'warning' 
-                                        ? "bg-amber-500/10 border-amber-500/20 text-amber-500"
-                                        : "bg-red-500/10 border-red-500/20 text-red-500"
-                                  )}>
-                                    {asset.healthStatus === 'heroic' && <Award className="size-2" />}
-                                    {asset.statusTag}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="text-right">
-                                <div className={cn(
-                                  "text-2xl font-black italic tracking-tighter tabular-nums leading-none",
-                                  asset.healthGrade === 'S' || asset.healthGrade === 'A+' ? "text-amber-400" :
-                                  asset.healthGrade === 'A' || asset.healthGrade === 'B' ? "text-emerald-400" :
-                                  "text-red-500"
-                                )} style={{ fontFamily: '"Playfair Display", serif' }}>
-                                   {asset.healthGrade}
-                                </div>
-                                <p className="text-[7px] font-bold text-white/20 uppercase tracking-[2px] mt-0.5">
-                                  评级
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2 relative z-10 py-3 border-y border-white/5 bg-white/[0.02] -mx-5 px-5">
-                               <div className="space-y-0.5">
-                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">效率得分</p>
-                                  <div className="flex items-baseline gap-1">
-                                     <span className="text-[13px] font-black font-mono leading-none text-white/80">{asset.efficiencyScore}</span>
-                                     <span className="text-[7px] font-bold text-white/10 italic">/ 100</span>
-                                  </div>
-                               </div>
-                               <div className="space-y-0.5 text-center border-x border-white/5 px-1">
-                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">二级市场估值</p>
-                                  <div className="flex items-baseline justify-center gap-0.5">
-                                     {asset.analysis ? (
-                                        <span className="text-[10px] font-black text-indigo-400 leading-none">
-                                          {asset.analysis.priceRange 
-                                            ? `¥${(asset.analysis.priceRange.min/1000).toFixed(1)}k-${(asset.analysis.priceRange.max/1000).toFixed(1)}k`
-                                            : `¥${asset.analysis.estimatedMarketPrice?.toFixed(0)}`}
-                                        </span>
-                                     ) : (
-                                        <span className="text-[9px] font-bold text-white/30 leading-none">点击进行评估</span>
-                                     )}
-                                  </div>
-                               </div>
-                               <div className="space-y-0.5 text-right">
-                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">当前实际日耗</p>
-                                  <div className="flex items-baseline justify-end gap-1">
-                                    <span className="text-[13px] font-black text-white/90 leading-none">¥{asset.actualDailyCost?.toFixed(1)}</span>
+                                  {asset.statusTag && (
                                     <div className={cn(
-                                      "size-1 rounded-full animate-pulse",
-                                      (asset.actualDailyCost || 0) > (asset.targetDailyCost || 0) ? "bg-red-500" : "bg-emerald-500"
-                                    )} />
+                                      "px-1.5 py-0.5 rounded-md text-[7px] font-black uppercase tracking-[2px] border inline-flex items-center gap-1",
+                                      asset.healthStatus === 'healthy' || asset.healthStatus === 'heroic' 
+                                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" 
+                                        : asset.healthStatus === 'warning' 
+                                          ? "bg-amber-500/10 border-amber-500/20 text-amber-500"
+                                          : "bg-red-500/10 border-red-500/20 text-red-500"
+                                    )}>
+                                      {asset.healthStatus === 'heroic' && <Award className="size-2" />}
+                                      {asset.statusTag}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {!asset.isSold && (
+                                <div className="text-right">
+                                  <div className={cn(
+                                    "text-2xl font-black italic tracking-tighter tabular-nums leading-none",
+                                    asset.healthGrade === 'S' || asset.healthGrade === 'A+' ? "text-amber-400" :
+                                    asset.healthGrade === 'A' || asset.healthGrade === 'B' ? "text-emerald-400" :
+                                    "text-red-500"
+                                  )} style={{ fontFamily: '"Playfair Display", serif' }}>
+                                    {asset.healthGrade}
                                   </div>
-                               </div>
+                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[2px] mt-0.5">
+                                    评级
+                                  </p>
+                                </div>
+                              )}
                             </div>
+
+                            {!asset.isSold ? (
+                              <div className="grid grid-cols-3 gap-2 relative z-10 py-3 border-y border-white/5 bg-white/[0.02] -mx-5 px-5">
+                                <div className="space-y-0.5">
+                                    <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">效率得分</p>
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="text-[13px] font-black font-mono leading-none text-white/80">{asset.efficiencyScore}</span>
+                                      <span className="text-[7px] font-bold text-white/10 italic">/ 100</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-0.5 text-center border-x border-white/5 px-1">
+                                    <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">二级市场估值</p>
+                                    <div className="flex items-baseline justify-center gap-0.5">
+                                      {asset.analysis ? (
+                                          <span className="text-[10px] font-black text-indigo-400 leading-none">
+                                            {asset.analysis.priceRange 
+                                              ? `¥${(asset.analysis.priceRange.min/1000).toFixed(1)}k-${(asset.analysis.priceRange.max/1000).toFixed(1)}k`
+                                              : `¥${asset.analysis.estimatedMarketPrice?.toFixed(0)}`}
+                                          </span>
+                                      ) : (
+                                          <span className="text-[9px] font-bold text-white/30 leading-none">点击进行评估</span>
+                                      )}
+                                    </div>
+                                </div>
+                                <div className="space-y-0.5 text-right">
+                                    <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">当前实际日耗</p>
+                                    <div className="flex items-baseline justify-end gap-1">
+                                      <span className="text-[13px] font-black text-white/90 leading-none">¥{asset.actualDailyCost?.toFixed(1)}</span>
+                                      <div className={cn(
+                                        "size-1 rounded-full animate-pulse",
+                                        (asset.actualDailyCost || 0) > (asset.targetDailyCost || 0) ? "bg-red-500" : "bg-emerald-500"
+                                      )} />
+                                    </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between relative z-10 py-3 border-y border-white/5 bg-white/[0.02] -mx-5 px-5">
+                                <span className="text-[9px] font-black uppercase text-white/40 tracking-[2px]">已成功变现离场</span>
+                                <span className="text-[13px] font-black text-emerald-400 font-mono">
+                                  {hideAmounts ? "¥****" : `¥${asset.soldPrice?.toLocaleString()}`}
+                                </span>
+                              </div>
+                            )}
 
                             <div className="mt-3 relative z-10 px-0.5">
                                <div className="flex justify-between items-center mb-1.5">
@@ -1582,6 +1603,7 @@ export default function App() {
                 initial={{ y: 20, opacity: 0, x: "-50%" }}
                 animate={{ y: 0, opacity: 1, x: "-50%" }}
                 exit={{ y: -20, opacity: 0, x: "-50%" }}
+                transition={{ duration: 0.5, ease: "easeInOut" }}
                 className="fixed top-[calc(16px+env(safe-area-inset-top))] left-1/2 z-[400] px-6 py-3 bg-[#1C1C1E] text-white rounded-2xl border border-white/10 shadow-2xl flex items-center gap-3"
               >
                 <div className="size-5 bg-[#10B981] rounded-full flex items-center justify-center">
@@ -1701,36 +1723,47 @@ export default function App() {
                             ¥{hideAmounts ? "******" : (selectedAsset.price ?? 0).toLocaleString()}
                           </p>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div
-                            className={cn(
-                              "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest",
-                              selectedAsset.analysis?.suggestion === "sell"
-                                ? "bg-red-500/20 text-red-500 border border-red-500/10"
-                                : selectedAsset.analysis?.suggestion ===
-                                    "monitor"
-                                  ? "bg-amber-500/20 text-amber-500 border border-amber-500/10"
+                        {!selectedAsset.isSold ? (
+                          <div className="flex flex-col items-end gap-2">
+                            <div
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest",
+                                selectedAsset.analysis?.suggestion === "sell"
+                                  ? "bg-red-500/20 text-red-500 border border-red-500/10"
                                   : selectedAsset.analysis?.suggestion ===
-                                      "hold"
-                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/10"
-                                    : "bg-white/5 text-white/40 border border-white/5",
-                            )}
-                          >
-                            {selectedAsset.analysis?.suggestion === "sell"
-                              ? "极易出手 · 建议变现"
-                              : selectedAsset.analysis?.suggestion === "monitor"
-                                ? "平稳观望 · 持续关注"
-                                : selectedAsset.analysis?.suggestion === "hold"
-                                  ? "建议长持 · 健康持有"
-                                  : "等待评估 · --"}
+                                      "monitor"
+                                    ? "bg-amber-500/20 text-amber-500 border border-amber-500/10"
+                                    : selectedAsset.analysis?.suggestion ===
+                                        "hold"
+                                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/10"
+                                      : "bg-white/5 text-white/40 border border-white/5",
+                              )}
+                            >
+                              {selectedAsset.analysis?.suggestion === "sell"
+                                ? "极易出手 · 建议变现"
+                                : selectedAsset.analysis?.suggestion === "monitor"
+                                  ? "平稳观望 · 持续关注"
+                                  : selectedAsset.analysis?.suggestion === "hold"
+                                    ? "建议长持 · 健康持有"
+                                    : "等待评估 · --"}
+                            </div>
+                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-tighter">
+                              行动建议 ·{" "}
+                              {(selectedAsset.lScore ?? 0) > 85
+                                ? "推荐交易"
+                                : "观察走势"}
+                            </p>
                           </div>
-                          <p className="text-[10px] font-bold text-white/20 uppercase tracking-tighter">
-                            行动建议 ·{" "}
-                            {(selectedAsset.lScore ?? 0) > 85
-                              ? "推荐交易"
-                              : "观察走势"}
-                          </p>
-                        </div>
+                        ) : (
+                          <div className="flex flex-col items-end gap-2">
+                             <div className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                               变现任务已达成
+                             </div>
+                             <p className="text-[10px] font-bold text-white/20 uppercase tracking-tighter">
+                               离场时间 · {selectedAsset.soldDate}
+                             </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="relative pt-6">
@@ -1796,25 +1829,29 @@ export default function App() {
                       {/* AI Re-Evaluation Section */}
                       <div className="space-y-6">
                         {/* Tags / Info Pills */}
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar scrollbar-hide py-1">
-                          <div className={cn(
-                            "px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border flex items-center gap-2 whitespace-nowrap shadow-lg",
-                            selectedAsset.healthStatus === "heroic"
-                              ? "bg-purple-900/30 text-yellow-400 border-yellow-500/30"
-                              : selectedAsset.healthStatus === "healthy" 
-                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                                : "bg-red-500/10 text-red-400 border-red-500/20"
-                          )}>
-                            {selectedAsset.healthStatus === 'heroic' && <Award className="size-3" />}
-                            核心评定：{selectedAsset.statusTag}
+                        {!selectedAsset.isSold && (
+                          <div className="flex gap-2 overflow-x-auto no-scrollbar scrollbar-hide py-1">
+                            {selectedAsset.statusTag && (
+                              <div className={cn(
+                                "px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border flex items-center gap-2 whitespace-nowrap shadow-lg",
+                                selectedAsset.healthStatus === "heroic"
+                                  ? "bg-purple-900/30 text-yellow-400 border-yellow-500/30"
+                                  : selectedAsset.healthStatus === "healthy" 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                                    : "bg-red-500/10 text-red-400 border-red-500/20"
+                              )}>
+                                {selectedAsset.healthStatus === 'heroic' && <Award className="size-3" />}
+                                核心评定：{selectedAsset.statusTag}
+                              </div>
+                            )}
+                            <div className="px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border bg-white/5 text-white/60 border-white/10 whitespace-nowrap">
+                              流动性：{selectedAsset.lRating} 级
+                            </div>
+                            <div className="px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border bg-white/5 text-white/60 border-white/10 whitespace-nowrap">
+                              市场需求：{selectedAsset.marketDemandIndex}%
+                            </div>
                           </div>
-                          <div className="px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border bg-white/5 text-white/60 border-white/10 whitespace-nowrap">
-                            流动性：{selectedAsset.lRating} 级
-                          </div>
-                          <div className="px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border bg-white/5 text-white/60 border-white/10 whitespace-nowrap">
-                            市场需求：{selectedAsset.marketDemandIndex}%
-                          </div>
-                        </div>
+                        )}
 
                         {/* Concentric Health Rings Dashboard - Stacked Layout */}
                         <div className="relative group bg-white/5 p-8 rounded-[40px] border border-white/5 overflow-hidden">
@@ -2009,7 +2046,7 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-col gap-4 pb-24">
-                        {selectedAsset.analysis?.suggestion === "sell" && (
+                        {selectedAsset.analysis?.suggestion === "sell" && !selectedAsset.isSold && (
                           <button 
                             onClick={() => handleSold(selectedAsset!, selectedAsset.marketPrice || selectedAsset.price * 0.8)}
                             className="w-full py-5 bg-[#F97316] text-white rounded-3xl text-sm font-bold flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20 active:scale-95 transition-all"
