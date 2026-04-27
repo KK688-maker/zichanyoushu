@@ -677,7 +677,7 @@ export default function App() {
                         )} />
                       </div>
                       <h2 className="text-[42px] font-black font-mono tracking-tighter tabular-nums text-white leading-none">
-                        ¥{hideAmounts ? "****" : stats.totalMarketValue.toLocaleString()}
+                        ¥{hideAmounts ? "****" : stats.totalInitialValue.toLocaleString()}
                       </h2>
                     </div>
                     {/* Compact Share Action */}
@@ -943,23 +943,36 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 relative z-10 py-3 border-y border-white/5 bg-white/[0.02] -mx-5 px-5">
+                            <div className="grid grid-cols-3 gap-2 relative z-10 py-3 border-y border-white/5 bg-white/[0.02] -mx-5 px-5">
                                <div className="space-y-0.5">
                                   <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">效率得分</p>
                                   <div className="flex items-baseline gap-1">
-                                     <span className="text-lg font-black font-mono leading-none text-white/80">{asset.efficiencyScore}</span>
+                                     <span className="text-[13px] font-black font-mono leading-none text-white/80">{asset.efficiencyScore}</span>
                                      <span className="text-[7px] font-bold text-white/10 italic">/ 100</span>
                                   </div>
                                </div>
+                               <div className="space-y-0.5 text-center border-x border-white/5 px-1">
+                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">二级市场估值</p>
+                                  <div className="flex items-baseline justify-center gap-0.5">
+                                     {asset.analysis ? (
+                                        <span className="text-[10px] font-black text-indigo-400 leading-none">
+                                          {asset.analysis.priceRange 
+                                            ? `¥${(asset.analysis.priceRange.min/1000).toFixed(1)}k-${(asset.analysis.priceRange.max/1000).toFixed(1)}k`
+                                            : `¥${asset.analysis.estimatedMarketPrice?.toFixed(0)}`}
+                                        </span>
+                                     ) : (
+                                        <span className="text-[9px] font-bold text-white/30 leading-none">点击进行评估</span>
+                                     )}
+                                  </div>
+                               </div>
                                <div className="space-y-0.5 text-right">
-                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">实际日耗数据</p>
-                                  <div className="flex items-baseline justify-end gap-1.5">
+                                  <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.5px]">当前实际日耗</p>
+                                  <div className="flex items-baseline justify-end gap-1">
                                     <span className="text-[13px] font-black text-white/90 leading-none">¥{asset.actualDailyCost?.toFixed(1)}</span>
                                     <div className={cn(
-                                      "size-1.5 rounded-full animate-pulse",
+                                      "size-1 rounded-full animate-pulse",
                                       (asset.actualDailyCost || 0) > (asset.targetDailyCost || 0) ? "bg-red-500" : "bg-emerald-500"
                                     )} />
-                                    <span className="text-[9px] font-bold text-white/30 leading-none">¥{asset.targetDailyCost?.toFixed(1)}</span>
                                   </div>
                                </div>
                             </div>
